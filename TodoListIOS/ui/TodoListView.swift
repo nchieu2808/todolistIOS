@@ -6,16 +6,18 @@
 //
 
 import SwiftUI
-import SwiftData
 
 struct TodoListView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \TodoItem.title) private var todos: [TodoItem]
+    @State private var viewModel = TodoListViewModel()
+    @State private var isPresentingAddTodo = false
 
     var body: some View {
         NavigationStack {
             Group {
-                if todos.isEmpty {
+                if viewModel.isLoading && viewModel.todos.isEmpty {
+                    ProgressView("Loading todos…")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if viewModel.todos.isEmpty {
                     ContentUnavailableView(
                         "No Todos",
                         systemImage: "checklist",
@@ -23,61 +25,100 @@ struct TodoListView: View {
                     )
                 } else {
                     List {
-                        ForEach(todos) { todo in
-                            TodoRowView(todo: todo)
+                        ForEach(viewModel.todos) { todo in
+                            TodoRowView(todo: todo) {
+                                Task { await viewModel.toggleCompleted(todo) }
+                            }
                         }
-                        .onDelete(perform: deleteTodos)
+                        .onDelete { offsets in
+                            Task { await viewModel.deleteTodos(at: offsets) }
+                        }
                     }
+                    .animation(.snappy(duration: 0.28, extraBounce: 0.05), value: viewModel.todos.map(\.id))
                 }
             }
             .navigationTitle("Todos")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     EditButton()
+                        .disabled(viewModel.todos.isEmpty)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: addTodo) {
+                    Button {
+                        isPresentingAddTodo = true
+                    } label: {
                         Label("Add Todo", systemImage: "plus")
                     }
                 }
             }
-        }
-    }
-
-    private func addTodo() {
-        withAnimation {
-            let todo = TodoItem(
-                id: UUID().uuidString,
-                title: "New Todo",
-                todoDescription: nil,
-                isCompleted: false
-            )
-            modelContext.insert(todo)
-        }
-    }
-
-    private func deleteTodos(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(todos[index])
+            .sheet(isPresented: $isPresentingAddTodo) {
+                NavigationStack {
+                    AddTodoView { draft in
+                        await viewModel.addTodo(draft)
+                    }
+                }
+            }
+            .refreshable {
+                await viewModel.loadTodos()
+            }
+            .task {
+                await viewModel.loadTodos()
+            }
+            .alert("Something went wrong", isPresented: errorAlertBinding) {
+                Button("OK", role: .cancel) {
+                    viewModel.errorMessage = nil
+                }
+            } message: {
+                Text(viewModel.errorMessage ?? "")
             }
         }
+    }
+
+    private var errorAlertBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.errorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    viewModel.errorMessage = nil
+                }
+            }
+        )
     }
 }
 
 private struct TodoRowView: View {
-    @Bindable var todo: TodoItem
+    let todo: TodoItem
+    let onToggle: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Button {
-                todo.isCompleted.toggle()
-            } label: {
+            Button(action: onToggle) {
                 Image(systemName: todo.isCompleted ? "checkmark.circle.fill" : "circle")
                     .font(.title2)
                     .foregroundStyle(todo.isCompleted ? .green : .secondary)
+                    .contentTransition(.symbolEffect(.replace))
+                    .animation(.snappy(duration: 0.2), value: todo.isCompleted)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(todo.isCompleted ? "Mark incomplete" : "Mark complete")
+
+            if let imageUrl = todo.imageUrl, let url = URL(string: imageUrl) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .failure:
+                        Image(systemName: "photo")
+                            .foregroundStyle(.secondary)
+                    default:
+                        ProgressView()
+                    }
+                }
+                .frame(width: 44, height: 44)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(todo.title)
@@ -93,9 +134,12 @@ private struct TodoRowView: View {
                 }
 
                 if let dueDate = todo.dueDateValue {
-                    Label(dueDate.formatted(date: .abbreviated, time: .shortened), systemImage: "calendar")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Label(
+                        dueDate.formatted(date: .abbreviated, time: .shortened),
+                        systemImage: "calendar"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
             }
 
@@ -105,14 +149,6 @@ private struct TodoRowView: View {
     }
 }
 
-private extension TodoItem {
-    var dueDateValue: Date? {
-        guard let dueDate else { return nil }
-        return Date(timeIntervalSince1970: TimeInterval(dueDate) / 1000)
-    }
-}
-
 #Preview {
     TodoListView()
-        .modelContainer(for: TodoItem.self, inMemory: true)
 }

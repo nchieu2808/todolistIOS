@@ -1,0 +1,37 @@
+---
+description: Always build and test after implementing any code change
+alwaysApply: true
+---
+
+# Build & Test After Every Implementation
+
+After finishing any implementation, refactor, or bug fix, **always verify** before ending the turn. Do not stop at “looks correct.”
+
+## Required steps
+
+1. Build the app for the iOS Simulator.
+2. Run tests when the change could affect behavior (logic, API, ViewModel, UI flow). Prefer running tests for non-trivial changes; always run them if the user asked for tests or you touched test files.
+3. If build or tests fail, fix the issues and re-run until they pass.
+4. Report the final result briefly (`BUILD SUCCEEDED` / tests passed, or what failed and how you fixed it).
+
+## Commands
+
+Use full Xcode (not Command Line Tools only):
+
+```bash
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+
+# Build
+xcodebuild -project TodoListIOS.xcodeproj -scheme TodoListIOS \
+  -destination 'platform=iOS Simulator,name=iPhone 17' build
+
+# Test
+xcodebuild -project TodoListIOS.xcodeproj -scheme TodoListIOS \
+  -destination 'platform=iOS Simulator,name=iPhone 17' test
+```
+
+If `iPhone 17` is unavailable, pick another available iPhone simulator from `xcodebuild -showdestinations`.
+
+## Exceptions
+
+Skip build/test only when the change is documentation-only (e.g. README, comments-only, Cursor rules) with no code impact. If unsure, build.

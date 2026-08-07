@@ -6,14 +6,10 @@
 //
 
 import Foundation
-import SwiftData
 
-@Model
-final class TodoItem {
-    @Attribute(.unique)
+struct TodoItem: Identifiable, Codable, Hashable {
     var id: String
     var title: String
-    /// Stored as `description` on Android / Firestore.
     var todoDescription: String?
     var isCompleted: Bool
     var imageUrl: String?
@@ -21,7 +17,7 @@ final class TodoItem {
     var dueDate: Int64?
 
     init(
-        id: String = "",
+        id: String = UUID().uuidString,
         title: String = "",
         todoDescription: String? = nil,
         isCompleted: Bool = false,
@@ -34,5 +30,26 @@ final class TodoItem {
         self.isCompleted = isCompleted
         self.imageUrl = imageUrl
         self.dueDate = dueDate
+    }
+
+    var dueDateValue: Date? {
+        guard let dueDate else { return nil }
+        return Date(timeIntervalSince1970: TimeInterval(dueDate) / 1000)
+    }
+
+    static func milliseconds(from date: Date) -> Int64 {
+        Int64(date.timeIntervalSince1970 * 1000)
+    }
+}
+
+extension Array where Element == TodoItem {
+    /// Incomplete first, then title A→Z.
+    func sortedForDisplay() -> [TodoItem] {
+        sorted { lhs, rhs in
+            if lhs.isCompleted != rhs.isCompleted {
+                return !lhs.isCompleted && rhs.isCompleted
+            }
+            return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+        }
     }
 }
