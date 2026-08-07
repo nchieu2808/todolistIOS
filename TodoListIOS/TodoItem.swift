@@ -17,7 +17,6 @@ final class TodoItem {
     var todoDescription: String?
     var isCompleted: Bool
     var imageUrl: String?
-    /// Unix timestamp in milliseconds (matches Android `Long?`).
     var dueDate: Int64?
 
     init(
