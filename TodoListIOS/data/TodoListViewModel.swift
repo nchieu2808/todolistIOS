@@ -17,10 +17,10 @@ final class TodoListViewModel {
     private(set) var isSaving = false
     var errorMessage: String?
 
-    private let api: any TodoAPI
+    private let store: TodoJSONStore
 
-    init(api: any TodoAPI = FakeTodoAPI.shared) {
-        self.api = api
+    init(store: TodoJSONStore = TodoJSONStore()) {
+        self.store = store
     }
 
     func loadTodos() async {
@@ -29,7 +29,7 @@ final class TodoListViewModel {
         defer { isLoading = false }
 
         do {
-            todos = try await api.fetchTodos()
+            todos = try store.load().sortedForDisplay()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -41,10 +41,26 @@ final class TodoListViewModel {
         defer { isSaving = false }
 
         do {
-            let created = try await api.createTodo(draft)
+            let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !title.isEmpty else { throw TodoStoreError.invalidTitle }
+
+            let description = draft.todoDescription?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let created = TodoItem(
+                id: UUID().uuidString,
+                title: title,
+                todoDescription: (description?.isEmpty == false) ? description : nil,
+                isCompleted: false,
+                imageUrl: draft.imageUrl,
+                dueDate: draft.dueDate.map(TodoItem.milliseconds(from:))
+            )
+
+            var next = todos
+            next.insert(created, at: 0)
+            try store.save(next)
+
             withAnimation(Self.listAnimation) {
-                todos.insert(created, at: 0)
-                todos = todos.sortedForDisplay()
+                todos = next.sortedForDisplay()
             }
             return true
         } catch {
@@ -59,13 +75,12 @@ final class TodoListViewModel {
         var updated = todo
         updated.isCompleted.toggle()
 
-        // Re-sort immediately so the row moves without waiting on the network.
         withAnimation(Self.listAnimation) {
             apply(updated)
         }
 
         do {
-            _ = try await api.updateTodo(updated)
+            try store.save(todos)
         } catch {
             withAnimation(Self.listAnimation) {
                 apply(todo)
@@ -75,7 +90,7 @@ final class TodoListViewModel {
     }
 
     func deleteTodos(at offsets: IndexSet) async {
-        let ids = offsets.map { todos[$0].id }
+        let previous = todos
 
         withAnimation(Self.listAnimation) {
             todos = todos.enumerated().compactMap { offset, item in
@@ -83,14 +98,13 @@ final class TodoListViewModel {
             }
         }
 
-        for id in ids {
-            do {
-                try await api.deleteTodo(id: id)
-            } catch {
-                errorMessage = error.localizedDescription
-                todos = (try? await api.fetchTodos()) ?? todos
-                break
+        do {
+            try store.save(todos)
+        } catch {
+            withAnimation(Self.listAnimation) {
+                todos = previous
             }
+            errorMessage = error.localizedDescription
         }
     }
 
