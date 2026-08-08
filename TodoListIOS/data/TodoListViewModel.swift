@@ -17,9 +17,9 @@ final class TodoListViewModel {
     private(set) var isSaving = false
     var errorMessage: String?
 
-    private let store: TodoJSONStore
+    private let store: any TodoStoring
 
-    init(store: TodoJSONStore = TodoJSONStore()) {
+    init(store: any TodoStoring) {
         self.store = store
     }
 

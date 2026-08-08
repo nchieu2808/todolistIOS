@@ -12,7 +12,7 @@ import Testing
 struct TodoListIOSTests {
 
     @Test @MainActor
-    func viewModelPersistsTodosThroughJSONStore() async throws {
+    func containerInjectsStoreIntoViewModelPersistence() async throws {
         let fileURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("todos-test-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: fileURL) }
@@ -21,9 +21,9 @@ struct TodoListIOSTests {
             TodoItem(id: "a", title: "Alpha", isCompleted: false),
             TodoItem(id: "b", title: "Beta", isCompleted: true)
         ]
-        let store = TodoJSONStore(fileURL: fileURL, seedTodos: seed)
+        let container = AppContainer.testing(fileURL: fileURL, seedTodos: seed)
 
-        let viewModel = TodoListViewModel(store: store)
+        let viewModel = container.makeTodoListViewModel()
         await viewModel.loadTodos()
         #expect(viewModel.todos.map(\.id).sorted() == ["a", "b"])
 
@@ -42,7 +42,8 @@ struct TodoListIOSTests {
             await viewModel.deleteTodos(at: IndexSet(integer: betaIndex))
         }
 
-        let reloaded = TodoListViewModel(store: TodoJSONStore(fileURL: fileURL, seedTodos: []))
+        let reloaded = AppContainer.testing(fileURL: fileURL, seedTodos: [])
+            .makeTodoListViewModel()
         await reloaded.loadTodos()
 
         #expect(reloaded.todos.map(\.id).sorted() == [createdID!, "a"].sorted())

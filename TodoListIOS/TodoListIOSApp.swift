@@ -9,9 +9,12 @@ import SwiftUI
 
 @main
 struct TodoListIOSApp: App {
+    private let container = AppContainer.live
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .appContainer(container)
         }
     }
 }

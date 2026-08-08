@@ -8,8 +8,12 @@
 import SwiftUI
 
 struct TodoListView: View {
-    @State private var viewModel = TodoListViewModel()
+    @State private var viewModel: TodoListViewModel
     @State private var isPresentingAddTodo = false
+
+    init(viewModel: TodoListViewModel) {
+        _viewModel = State(initialValue: viewModel)
+    }
 
     var body: some View {
         NavigationStack {
@@ -150,5 +154,5 @@ private struct TodoRowView: View {
 }
 
 #Preview {
-    TodoListView()
+    TodoListView(viewModel: AppContainer.preview.makeTodoListViewModel())
 }

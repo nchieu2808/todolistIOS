@@ -29,7 +29,7 @@ enum TodoStoreError: LocalizedError {
 }
 
 /// Reads and writes todos as pretty-printed JSON on disk.
-struct TodoJSONStore {
+struct TodoJSONStore: TodoStoring {
     let fileURL: URL
     private let seedTodos: [TodoItem]
 

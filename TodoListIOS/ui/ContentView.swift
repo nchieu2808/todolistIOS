@@ -8,11 +8,14 @@
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(\.appContainer) private var container
+
     var body: some View {
-        TodoListView()
+        TodoListView(viewModel: container.makeTodoListViewModel())
     }
 }
 
 #Preview {
     ContentView()
+        .appContainer(.preview)
 }
