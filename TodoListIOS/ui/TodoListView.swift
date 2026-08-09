@@ -30,8 +30,10 @@ struct TodoListView: View {
                 } else {
                     List {
                         ForEach(viewModel.todos) { todo in
-                            TodoRowView(todo: todo) {
-                                Task { await viewModel.toggleCompleted(todo) }
+                            NavigationLink(value: todo.id) {
+                                TodoRowView(todo: todo) {
+                                    Task { await viewModel.toggleCompleted(todo) }
+                                }
                             }
                         }
                         .onDelete { offsets in
@@ -42,6 +44,24 @@ struct TodoListView: View {
                 }
             }
             .navigationTitle("Todos")
+            .navigationDestination(for: String.self) { todoID in
+                if let todo = viewModel.todos.first(where: { $0.id == todoID }) {
+                    TodoDetailView(todo: todo) {
+                        Task {
+                            guard let current = viewModel.todos.first(where: { $0.id == todoID }) else {
+                                return
+                            }
+                            await viewModel.toggleCompleted(current)
+                        }
+                    }
+                } else {
+                    ContentUnavailableView(
+                        "Todo Not Found",
+                        systemImage: "checklist",
+                        description: Text("This todo may have been deleted.")
+                    )
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     EditButton()
@@ -103,7 +123,7 @@ private struct TodoRowView: View {
                     .contentTransition(.symbolEffect(.replace))
                     .animation(.snappy(duration: 0.2), value: todo.isCompleted)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.borderless)
             .accessibilityLabel(todo.isCompleted ? "Mark incomplete" : "Mark complete")
 
             if let imageUrl = todo.imageUrl, let url = URL(string: imageUrl) {
