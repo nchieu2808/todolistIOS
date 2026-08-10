@@ -15,12 +15,31 @@ final class TodoListViewModel {
     private(set) var todos: [TodoItem] = []
     private(set) var isLoading = false
     private(set) var isSaving = false
+    /// Debounced query used for filtering. Updates after `searchDebounceNanoseconds`.
+    private(set) var activeQuery = ""
     var errorMessage: String?
+    /// Immediate search-field text. Filtering waits for debounce.
+    var searchText = "" {
+        didSet { scheduleSearchDebounce() }
+    }
+
+    /// Todos matching `activeQuery` (title or description), or all todos when empty.
+    var filteredTodos: [TodoItem] {
+        let query = activeQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return todos }
+        return todos.filter { $0.matchesSearch(query) }
+    }
 
     private let store: any TodoStoring
+    private let searchDebounceNanoseconds: UInt64
+    private var searchDebounceTask: Task<Void, Never>?
 
-    init(store: any TodoStoring) {
+    init(
+        store: any TodoStoring,
+        searchDebounceNanoseconds: UInt64 = 300_000_000
+    ) {
         self.store = store
+        self.searchDebounceNanoseconds = searchDebounceNanoseconds
     }
 
     func loadTodos() async {
@@ -89,13 +108,18 @@ final class TodoListViewModel {
         }
     }
 
+    /// Deletes items at offsets in `filteredTodos`, then persists the full list.
     func deleteTodos(at offsets: IndexSet) async {
+        let idsToDelete = Set(offsets.compactMap { offset -> String? in
+            guard filteredTodos.indices.contains(offset) else { return nil }
+            return filteredTodos[offset].id
+        })
+        guard !idsToDelete.isEmpty else { return }
+
         let previous = todos
 
         withAnimation(Self.listAnimation) {
-            todos = todos.enumerated().compactMap { offset, item in
-                offsets.contains(offset) ? nil : item
-            }
+            todos = todos.filter { !idsToDelete.contains($0.id) }
         }
 
         do {
@@ -108,6 +132,19 @@ final class TodoListViewModel {
         }
     }
 
+    private func scheduleSearchDebounce() {
+        searchDebounceTask?.cancel()
+        let pending = searchText
+        let delay = searchDebounceNanoseconds
+        searchDebounceTask = Task {
+            if delay > 0 {
+                try? await Task.sleep(nanoseconds: delay)
+            }
+            guard !Task.isCancelled else { return }
+            activeQuery = pending
+        }
+    }
+
     private func apply(_ todo: TodoItem) {
         guard let index = todos.firstIndex(where: { $0.id == todo.id }) else { return }
         todos[index] = todo
@@ -115,4 +152,16 @@ final class TodoListViewModel {
     }
 
     private static let listAnimation = Animation.snappy(duration: 0.28, extraBounce: 0.05)
+}
+
+extension TodoItem {
+    func matchesSearch(_ query: String) -> Bool {
+        if title.localizedCaseInsensitiveContains(query) {
+            return true
+        }
+        if let todoDescription, todoDescription.localizedCaseInsensitiveContains(query) {
+            return true
+        }
+        return false
+    }
 }

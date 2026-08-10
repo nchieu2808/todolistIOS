@@ -27,9 +27,11 @@ struct TodoListView: View {
                         systemImage: "checklist",
                         description: Text("Tap + to add your first todo.")
                     )
+                } else if viewModel.filteredTodos.isEmpty {
+                    ContentUnavailableView.search(text: viewModel.activeQuery)
                 } else {
                     List {
-                        ForEach(viewModel.todos) { todo in
+                        ForEach(viewModel.filteredTodos) { todo in
                             NavigationLink(value: todo.id) {
                                 TodoRowView(todo: todo) {
                                     Task { await viewModel.toggleCompleted(todo) }
@@ -40,10 +42,14 @@ struct TodoListView: View {
                             Task { await viewModel.deleteTodos(at: offsets) }
                         }
                     }
-                    .animation(.snappy(duration: 0.28, extraBounce: 0.05), value: viewModel.todos.map(\.id))
+                    .animation(
+                        .snappy(duration: 0.28, extraBounce: 0.05),
+                        value: viewModel.filteredTodos.map(\.id)
+                    )
                 }
             }
             .navigationTitle("Todos")
+            .searchable(text: $viewModel.searchText, prompt: "Search todos")
             .navigationDestination(for: String.self) { todoID in
                 if let todo = viewModel.todos.first(where: { $0.id == todoID }) {
                     TodoDetailView(todo: todo) {
@@ -65,7 +71,7 @@ struct TodoListView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     EditButton()
-                        .disabled(viewModel.todos.isEmpty)
+                        .disabled(viewModel.filteredTodos.isEmpty)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
