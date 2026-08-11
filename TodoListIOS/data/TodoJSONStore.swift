@@ -89,7 +89,7 @@ struct TodoJSONStore: TodoStoring {
             for: .documentDirectory,
             in: .userDomainMask
         ).first!
-        return documents.appendingPathComponent("todos.json", isDirectory: false)
+        return documents.appendingPathComponent("item.json", isDirectory: false)
     }
 
     static let sampleTodos: [TodoItem] = {

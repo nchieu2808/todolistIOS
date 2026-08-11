@@ -14,7 +14,7 @@ struct TodoListIOSTests {
     @Test @MainActor
     func containerInjectsStoreIntoViewModelPersistence() async throws {
         let fileURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("todos-test-\(UUID().uuidString).json")
+            .appendingPathComponent("item-test-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: fileURL) }
 
         let seed = [

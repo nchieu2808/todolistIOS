@@ -27,7 +27,7 @@ extension AppContainer {
 
     static var preview: AppContainer {
         let fileURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("todos-preview.json")
+            .appendingPathComponent("item-preview.json")
         return AppContainer(
             todoStore: TodoJSONStore(
                 fileURL: fileURL,

@@ -74,7 +74,7 @@ struct AppContainerTests {
     @Test
     func testingFactoryWiresJSONStoreWithSeed() async throws {
         let fileURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("todos-di-\(UUID().uuidString).json")
+            .appendingPathComponent("item-di-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: fileURL) }
 
         let seed = [TodoItem(id: "seed", title: "Seeded", isCompleted: false)]
@@ -100,7 +100,7 @@ struct AppContainerTests {
     @Test
     func previewUsesTemporaryJSONStoreWithSampleTodos() async throws {
         let previewURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("todos-preview.json")
+            .appendingPathComponent("item-preview.json")
         try? FileManager.default.removeItem(at: previewURL)
 
         let container = AppContainer.preview
