@@ -28,7 +28,7 @@ struct TodoListView: View {
                         description: Text("Tap + to add your first todo.")
                     )
                 } else if viewModel.filteredTodos.isEmpty {
-                    ContentUnavailableView.search(text: viewModel.activeQuery)
+                    emptyFilteredContent
                 } else {
                     List {
                         ForEach(viewModel.filteredTodos) { todo in
@@ -70,8 +70,20 @@ struct TodoListView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    EditButton()
-                        .disabled(viewModel.filteredTodos.isEmpty)
+                    Menu {
+                        Picker("Show", selection: $viewModel.statusFilter) {
+                            ForEach(TodoStatusFilter.allCases) { filter in
+                                Label(filter.title, systemImage: filter.systemImage)
+                                    .tag(filter)
+                            }
+                        }
+                    } label: {
+                        Label(
+                            viewModel.statusFilter.title,
+                            systemImage: "line.3.horizontal.decrease.circle"
+                        )
+                    }
+                    .accessibilityLabel("Filter tasks")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -113,6 +125,20 @@ struct TodoListView: View {
                 }
             }
         )
+    }
+
+    @ViewBuilder
+    private var emptyFilteredContent: some View {
+        let query = viewModel.activeQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !query.isEmpty {
+            ContentUnavailableView.search(text: viewModel.activeQuery)
+        } else {
+            ContentUnavailableView(
+                "No \(viewModel.statusFilter.title) Todos",
+                systemImage: viewModel.statusFilter.systemImage,
+                description: Text("Nothing matches this filter right now.")
+            )
+        }
     }
 }
 

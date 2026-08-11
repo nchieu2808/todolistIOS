@@ -9,6 +9,38 @@ import Foundation
 import Observation
 import SwiftUI
 
+enum TodoStatusFilter: String, CaseIterable, Identifiable {
+    case all
+    case pending
+    case completed
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .all: "All"
+        case .pending: "Pending"
+        case .completed: "Completed"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .all: "list.bullet"
+        case .pending: "circle"
+        case .completed: "checkmark.circle"
+        }
+    }
+
+    func matches(_ todo: TodoItem) -> Bool {
+        switch self {
+        case .all: true
+        case .pending: !todo.isCompleted
+        case .completed: todo.isCompleted
+        }
+    }
+}
+
 @Observable
 @MainActor
 final class TodoListViewModel {
@@ -18,16 +50,20 @@ final class TodoListViewModel {
     /// Debounced query used for filtering. Updates after `searchDebounceNanoseconds`.
     private(set) var activeQuery = ""
     var errorMessage: String?
+    /// Status dropdown filter: all, pending, or completed.
+    var statusFilter: TodoStatusFilter = .all
     /// Immediate search-field text. Filtering waits for debounce.
     var searchText = "" {
         didSet { scheduleSearchDebounce() }
     }
 
-    /// Todos matching `activeQuery` (title or description), or all todos when empty.
+    /// Todos matching `statusFilter` and `activeQuery` (title or description).
     var filteredTodos: [TodoItem] {
         let query = activeQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return todos }
-        return todos.filter { $0.matchesSearch(query) }
+        return todos.filter { todo in
+            statusFilter.matches(todo)
+                && (query.isEmpty || todo.matchesSearch(query))
+        }
     }
 
     private let store: any TodoStoring
