@@ -47,18 +47,26 @@ final class TodoListViewModel {
     private(set) var todos: [TodoItem] = []
     private(set) var isLoading = false
     private(set) var isSaving = false
+    private(set) var isLoadingMore = false
     /// Debounced query used for filtering. Updates after `searchDebounceNanoseconds`.
     private(set) var activeQuery = ""
+    /// How many matching todos are currently visible (grows via `loadMore`).
+    private(set) var displayedCount = 0
     var errorMessage: String?
     /// Status dropdown filter: all, pending, or completed.
-    var statusFilter: TodoStatusFilter = .all
+    var statusFilter: TodoStatusFilter = .all {
+        didSet {
+            guard oldValue != statusFilter else { return }
+            resetPagination()
+        }
+    }
     /// Immediate search-field text. Filtering waits for debounce.
     var searchText = "" {
         didSet { scheduleSearchDebounce() }
     }
 
-    /// Todos matching `statusFilter` and `activeQuery` (title or description).
-    var filteredTodos: [TodoItem] {
+    /// Full match set for the active search + status filter (not paginated).
+    var matchingTodos: [TodoItem] {
         let query = activeQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         return todos.filter { todo in
             statusFilter.matches(todo)
@@ -66,16 +74,29 @@ final class TodoListViewModel {
         }
     }
 
+    /// Visible page of `matchingTodos`.
+    var filteredTodos: [TodoItem] {
+        Array(matchingTodos.prefix(displayedCount))
+    }
+
+    var hasMorePages: Bool {
+        displayedCount < matchingTodos.count
+    }
+
     private let store: any TodoStoring
     private let searchDebounceNanoseconds: UInt64
+    private let pageSize: Int
     private var searchDebounceTask: Task<Void, Never>?
 
     init(
         store: any TodoStoring,
-        searchDebounceNanoseconds: UInt64 = 300_000_000
+        searchDebounceNanoseconds: UInt64 = 300_000_000,
+        pageSize: Int = 10
     ) {
         self.store = store
         self.searchDebounceNanoseconds = searchDebounceNanoseconds
+        self.pageSize = max(pageSize, 1)
+        self.displayedCount = self.pageSize
     }
 
     func loadTodos() async {
@@ -85,6 +106,7 @@ final class TodoListViewModel {
 
         do {
             todos = try store.load().sortedForDisplay()
+            resetPagination()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -116,6 +138,7 @@ final class TodoListViewModel {
 
             withAnimation(Self.listAnimation) {
                 todos = next.sortedForDisplay()
+                resetPagination()
             }
             return true
         } catch {
@@ -153,9 +176,11 @@ final class TodoListViewModel {
         guard !idsToDelete.isEmpty else { return }
 
         let previous = todos
+        let previousDisplayedCount = displayedCount
 
         withAnimation(Self.listAnimation) {
             todos = todos.filter { !idsToDelete.contains($0.id) }
+            clampDisplayedCount()
         }
 
         do {
@@ -163,9 +188,31 @@ final class TodoListViewModel {
         } catch {
             withAnimation(Self.listAnimation) {
                 todos = previous
+                displayedCount = previousDisplayedCount
             }
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Loads the next page when `currentItem` is near the end of the visible list.
+    func loadMoreIfNeeded(currentItem: TodoItem) async {
+        guard hasMorePages,
+              let index = filteredTodos.firstIndex(where: { $0.id == currentItem.id }),
+              index >= filteredTodos.count - 2
+        else { return }
+        await loadMore()
+    }
+
+    func loadMore() async {
+        guard hasMorePages, !isLoadingMore else { return }
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+
+        // Brief yield so the footer spinner can appear during pagination.
+        try? await Task.sleep(nanoseconds: 150_000_000)
+        guard !Task.isCancelled else { return }
+
+        displayedCount = min(displayedCount + pageSize, matchingTodos.count)
     }
 
     private func scheduleSearchDebounce() {
@@ -178,6 +225,19 @@ final class TodoListViewModel {
             }
             guard !Task.isCancelled else { return }
             activeQuery = pending
+            resetPagination()
+        }
+    }
+
+    private func resetPagination() {
+        displayedCount = min(pageSize, matchingTodos.count)
+    }
+
+    private func clampDisplayedCount() {
+        if matchingTodos.isEmpty {
+            displayedCount = 0
+        } else {
+            displayedCount = min(max(displayedCount, min(pageSize, matchingTodos.count)), matchingTodos.count)
         }
     }
 
@@ -185,6 +245,7 @@ final class TodoListViewModel {
         guard let index = todos.firstIndex(where: { $0.id == todo.id }) else { return }
         todos[index] = todo
         todos = todos.sortedForDisplay()
+        clampDisplayedCount()
     }
 
     private static let listAnimation = Animation.snappy(duration: 0.28, extraBounce: 0.05)

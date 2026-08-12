@@ -37,9 +37,25 @@ struct TodoListView: View {
                                     Task { await viewModel.toggleCompleted(todo) }
                                 }
                             }
+                            .onAppear {
+                                Task { await viewModel.loadMoreIfNeeded(currentItem: todo) }
+                            }
                         }
                         .onDelete { offsets in
                             Task { await viewModel.deleteTodos(at: offsets) }
+                        }
+
+                        if viewModel.hasMorePages || viewModel.isLoadingMore {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                    .padding(.vertical, 8)
+                                Spacer()
+                            }
+                            .listRowSeparator(.hidden)
+                            .onAppear {
+                                Task { await viewModel.loadMore() }
+                            }
                         }
                     }
                     .animation(
