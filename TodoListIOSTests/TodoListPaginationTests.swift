@@ -53,7 +53,7 @@ struct TodoListPaginationTests {
         #expect(viewModel.filteredTodos.count == 10)
 
         viewModel.searchText = "alpha"
-        await waitForDebounce()
+        await waitForDebounce(viewModel, query: "alpha")
 
         #expect(viewModel.matchingTodos.count == 15)
         #expect(viewModel.filteredTodos.count == 5)
@@ -110,7 +110,10 @@ struct TodoListPaginationTests {
         )
     }
 
-    private func waitForDebounce() async {
-        try? await Task.sleep(nanoseconds: 40_000_000)
+    private func waitForDebounce(_ viewModel: TodoListViewModel, query: String) async {
+        let deadline = ContinuousClock.now + .seconds(1)
+        while viewModel.activeQuery != query, ContinuousClock.now < deadline {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
     }
 }

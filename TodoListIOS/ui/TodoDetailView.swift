@@ -109,7 +109,7 @@ struct TodoDetailView: View {
 #Preview {
     NavigationStack {
         TodoDetailView(
-            todo: TodoJSONStore.sampleTodos[0],
+            todo: TodoItem.sampleTodos[0],
             onToggleCompleted: {}
         )
     }

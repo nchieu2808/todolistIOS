@@ -23,7 +23,7 @@ struct TodoListSearchTests {
         #expect(viewModel.activeQuery.isEmpty)
         #expect(viewModel.filteredTodos.count == 3)
 
-        await waitForDebounce()
+        await waitForDebounce(viewModel, query: "buy")
 
         #expect(viewModel.activeQuery == "buy")
         #expect(viewModel.filteredTodos.map(\.id) == ["1", "3"])
@@ -43,7 +43,7 @@ struct TodoListSearchTests {
         await viewModel.loadTodos()
 
         viewModel.searchText = "cleaning"
-        await waitForDebounce()
+        await waitForDebounce(viewModel, query: "cleaning")
 
         #expect(viewModel.filteredTodos.map(\.id) == ["1"])
     }
@@ -60,7 +60,7 @@ struct TodoListSearchTests {
         viewModel.searchText = "a"
         viewModel.searchText = "al"
         viewModel.searchText = "alp"
-        await waitForDebounce()
+        await waitForDebounce(viewModel, query: "alp")
 
         #expect(viewModel.activeQuery == "alp")
         #expect(viewModel.filteredTodos.map(\.id).sorted() == ["1", "3"])
@@ -75,11 +75,11 @@ struct TodoListSearchTests {
         await viewModel.loadTodos()
 
         viewModel.searchText = "alpha"
-        await waitForDebounce()
+        await waitForDebounce(viewModel, query: "alpha")
         #expect(viewModel.filteredTodos.map(\.id) == ["1"])
 
         viewModel.searchText = ""
-        await waitForDebounce()
+        await waitForDebounce(viewModel, query: "")
 
         #expect(viewModel.activeQuery.isEmpty)
         #expect(viewModel.filteredTodos.map(\.id).sorted() == ["1", "2"])
@@ -99,7 +99,7 @@ struct TodoListSearchTests {
         await viewModel.loadTodos()
 
         viewModel.searchText = "alp"
-        await waitForDebounce()
+        await waitForDebounce(viewModel, query: "alp")
         #expect(viewModel.filteredTodos.map(\.id).sorted() == ["1", "3"])
 
         // Delete first filtered row ("Alpha" or "Alpine" depending on sort).
@@ -118,7 +118,10 @@ struct TodoListSearchTests {
         )
     }
 
-    private func waitForDebounce() async {
-        try? await Task.sleep(nanoseconds: 40_000_000)
+    private func waitForDebounce(_ viewModel: TodoListViewModel, query: String) async {
+        let deadline = ContinuousClock.now + .seconds(1)
+        while viewModel.activeQuery != query, ContinuousClock.now < deadline {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
     }
 }

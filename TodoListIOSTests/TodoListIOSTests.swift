@@ -13,15 +13,15 @@ struct TodoListIOSTests {
 
     @Test @MainActor
     func containerInjectsStoreIntoViewModelPersistence() async throws {
-        let fileURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("item-test-\(UUID().uuidString).json")
-        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let storeURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("todos-test-\(UUID().uuidString).sqlite")
+        defer { removeSQLiteStore(at: storeURL) }
 
         let seed = [
             TodoItem(id: "a", title: "Alpha", isCompleted: false),
             TodoItem(id: "b", title: "Beta", isCompleted: true)
         ]
-        let container = AppContainer.testing(fileURL: fileURL, seedTodos: seed)
+        let container = AppContainer.testing(storeURL: storeURL, seedTodos: seed)
 
         let viewModel = container.makeTodoListViewModel()
         await viewModel.loadTodos()
@@ -42,13 +42,20 @@ struct TodoListIOSTests {
             await viewModel.deleteTodos(at: IndexSet(integer: betaIndex))
         }
 
-        let reloaded = AppContainer.testing(fileURL: fileURL, seedTodos: [])
+        let reloaded = AppContainer.testing(storeURL: storeURL, seedTodos: [])
             .makeTodoListViewModel()
         await reloaded.loadTodos()
 
         #expect(reloaded.todos.map(\.id).sorted() == [createdID!, "a"].sorted())
         #expect(reloaded.todos.first(where: { $0.id == "a" })?.isCompleted == true)
         #expect(reloaded.todos.first(where: { $0.id == createdID })?.todoDescription == "From test")
-        #expect(FileManager.default.fileExists(atPath: fileURL.path))
+        #expect(FileManager.default.fileExists(atPath: storeURL.path))
     }
+}
+
+func removeSQLiteStore(at url: URL) {
+    let fileManager = FileManager.default
+    try? fileManager.removeItem(at: url)
+    try? fileManager.removeItem(at: URL(fileURLWithPath: url.path + "-wal"))
+    try? fileManager.removeItem(at: URL(fileURLWithPath: url.path + "-shm"))
 }

@@ -23,25 +23,32 @@ final class AppContainer {
 }
 
 extension AppContainer {
-    static let live = AppContainer(todoStore: TodoJSONStore())
+    static let live = AppContainer(
+        todoStore: TodoCoreDataStore(
+            storeURL: TodoCoreDataStore.defaultStoreURL,
+            seedTodos: TodoItem.sampleTodos,
+            legacyJSONURL: TodoCoreDataStore.legacyJSONFileURL
+        )
+    )
 
     static var preview: AppContainer {
-        let fileURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("item-preview.json")
-        return AppContainer(
-            todoStore: TodoJSONStore(
-                fileURL: fileURL,
-                seedTodos: TodoJSONStore.sampleTodos
+        AppContainer(
+            todoStore: TodoCoreDataStore(
+                inMemory: true,
+                seedTodos: TodoItem.sampleTodos
             )
         )
     }
 
     static func testing(
-        fileURL: URL,
+        storeURL: URL,
         seedTodos: [TodoItem]
     ) -> AppContainer {
         AppContainer(
-            todoStore: TodoJSONStore(fileURL: fileURL, seedTodos: seedTodos)
+            todoStore: TodoCoreDataStore(
+                storeURL: storeURL,
+                seedTodos: seedTodos
+            )
         )
     }
 }

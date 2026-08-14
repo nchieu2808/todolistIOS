@@ -1,15 +1,15 @@
 # TodoListIOS
 
-A native iOS todo list app built with **SwiftUI** and **SwiftData**. Todos are stored on-device and the data model is shaped to stay compatible with an Android / Firestore counterpart.
+A native iOS todo list app built with **SwiftUI** and **Core Data**. Todos are stored on-device and the data model is shaped to stay compatible with an Android / Firestore counterpart.
 
 ## Features
 
 - Add and delete todos
 - Mark todos as complete / incomplete
 - Empty state when there are no items
-- Edit mode for managing the list
-- Optional description and due date on each item
-- Local persistence with SwiftData
+- Search and status filters with paginated list loading
+- Optional description, due date, and image URL on each item
+- Local persistence with Core Data (SQLite)
 
 ## Requirements
 
@@ -33,16 +33,30 @@ A native iOS todo list app built with **SwiftUI** and **SwiftData**. Todos are s
 
 ```
 TodoListIOS/
-├── TodoListIOSApp.swift     # App entry point & SwiftData container
+├── TodoListIOSApp.swift          # App entry point
 ├── data/
-│   ├── TodoItem.swift       # Todo model (@Model)
-│   └── Item.swift           # Legacy template model
+│   ├── TodoItem.swift            # Todo value type
+│   ├── TodoStoring.swift         # Persistence protocol
+│   ├── TodoCoreDataStore.swift   # Core Data store
+│   ├── TodoEntity.swift          # NSManagedObject
+│   ├── TodoList.xcdatamodeld     # Core Data model
+│   └── TodoListViewModel.swift
+├── di/
+│   └── AppContainer.swift        # Composition root
 ├── ui/
-│   ├── ContentView.swift    # Root view
-│   └── TodoListView.swift   # List, add, delete, complete
+│   ├── ContentView.swift
+│   ├── TodoListView.swift
+│   ├── AddTodoView.swift
+│   └── TodoDetailView.swift
 ├── Assets.xcassets/
 └── Info.plist
 ```
+
+## Persistence
+
+`TodoCoreDataStore` implements `TodoStoring` and saves todos with Core Data. The live app uses a SQLite file (`TodoList.sqlite`) in the documents directory. Previews and some tests use an in-memory store.
+
+If an older `item.json` file is still present and Core Data is empty, that JSON list is imported once and then removed.
 
 ## Data model
 

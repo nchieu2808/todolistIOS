@@ -50,7 +50,7 @@ struct TodoStatusFilterTests {
 
         viewModel.statusFilter = .pending
         viewModel.searchText = "buy"
-        try? await Task.sleep(nanoseconds: 40_000_000)
+        await waitForDebounce(viewModel, query: "buy")
 
         #expect(viewModel.filteredTodos.map(\.id) == ["1"])
     }
@@ -64,5 +64,12 @@ struct TodoStatusFilterTests {
             ]),
             searchDebounceNanoseconds: 20_000_000
         )
+    }
+
+    private func waitForDebounce(_ viewModel: TodoListViewModel, query: String) async {
+        let deadline = ContinuousClock.now + .seconds(1)
+        while viewModel.activeQuery != query, ContinuousClock.now < deadline {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
     }
 }

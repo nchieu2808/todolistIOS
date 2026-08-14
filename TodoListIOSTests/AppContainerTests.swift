@@ -72,49 +72,46 @@ struct AppContainerTests {
     }
 
     @Test
-    func testingFactoryWiresJSONStoreWithSeed() async throws {
-        let fileURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("item-di-\(UUID().uuidString).json")
-        defer { try? FileManager.default.removeItem(at: fileURL) }
+    func testingFactoryWiresCoreDataStoreWithSeed() async throws {
+        let storeURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("todos-di-\(UUID().uuidString).sqlite")
+        defer { removeSQLiteStore(at: storeURL) }
 
         let seed = [TodoItem(id: "seed", title: "Seeded", isCompleted: false)]
-        let container = AppContainer.testing(fileURL: fileURL, seedTodos: seed)
+        let container = AppContainer.testing(storeURL: storeURL, seedTodos: seed)
 
-        let jsonStore = try #require(container.todoStore as? TodoJSONStore)
-        #expect(jsonStore.fileURL == fileURL)
+        let coreDataStore = try #require(container.todoStore as? TodoCoreDataStore)
+        #expect(coreDataStore.storeURL == storeURL)
+        #expect(!coreDataStore.isInMemory)
 
         let viewModel = container.makeTodoListViewModel()
         await viewModel.loadTodos()
 
         #expect(viewModel.todos.map(\.id) == ["seed"])
-        #expect(FileManager.default.fileExists(atPath: fileURL.path))
+        #expect(FileManager.default.fileExists(atPath: storeURL.path))
     }
 
     @Test
-    func liveUsesDefaultJSONStore() throws {
+    func liveUsesDefaultCoreDataStore() throws {
         let container = AppContainer.live
-        let store = try #require(container.todoStore as? TodoJSONStore)
-        #expect(store.fileURL == TodoJSONStore.defaultFileURL)
+        let store = try #require(container.todoStore as? TodoCoreDataStore)
+        #expect(store.storeURL == TodoCoreDataStore.defaultStoreURL)
+        #expect(!store.isInMemory)
     }
 
     @Test
-    func previewUsesTemporaryJSONStoreWithSampleTodos() async throws {
-        let previewURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("item-preview.json")
-        try? FileManager.default.removeItem(at: previewURL)
-
+    func previewUsesInMemoryCoreDataStoreWithSampleTodos() async throws {
         let container = AppContainer.preview
-        let store = try #require(container.todoStore as? TodoJSONStore)
-        #expect(store.fileURL == previewURL)
+        let store = try #require(container.todoStore as? TodoCoreDataStore)
+        #expect(store.isInMemory)
+        #expect(store.storeURL == nil)
 
         let viewModel = container.makeTodoListViewModel()
         await viewModel.loadTodos()
 
-        #expect(viewModel.todos.count == TodoJSONStore.sampleTodos.count)
+        #expect(viewModel.todos.count == TodoItem.sampleTodos.count)
         #expect(
-            Set(viewModel.todos.map(\.id)) == Set(TodoJSONStore.sampleTodos.map(\.id))
+            Set(viewModel.todos.map(\.id)) == Set(TodoItem.sampleTodos.map(\.id))
         )
-
-        try? FileManager.default.removeItem(at: previewURL)
     }
 }
