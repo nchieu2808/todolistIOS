@@ -8,14 +8,12 @@
 import CoreData
 import Foundation
 
-/// Reads and writes todos with Core Data (SQLite, or an in-memory store for previews/tests).
+/// Reads and writes todos with Core Data SQLite on disk.
 final class TodoCoreDataStore: TodoStoring {
-    let storeURL: URL?
-    let isInMemory: Bool
+    let storeURL: URL
 
     private let container: NSPersistentContainer
     private let seedTodos: [TodoItem]
-    private let legacyJSONURL: URL?
     private var didLoadStore = false
     private var storeLoadError: Error?
 
@@ -24,38 +22,23 @@ final class TodoCoreDataStore: TodoStoring {
     }
 
     init(
-        storeURL: URL? = TodoCoreDataStore.defaultStoreURL,
-        inMemory: Bool = false,
-        seedTodos: [TodoItem] = TodoItem.sampleTodos,
-        legacyJSONURL: URL? = nil
+        storeURL: URL = TodoCoreDataStore.defaultStoreURL,
+        seedTodos: [TodoItem] = []
     ) {
-        self.isInMemory = inMemory
-        self.storeURL = inMemory ? nil : storeURL
+        self.storeURL = storeURL
         self.seedTodos = seedTodos
-        self.legacyJSONURL = legacyJSONURL
-        self.container = TodoCoreDataStore.makeContainer(
-            storeURL: storeURL,
-            inMemory: inMemory
-        )
+        self.container = TodoCoreDataStore.makeContainer(storeURL: storeURL)
         container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
         container.viewContext.automaticallyMergesChangesFromParent = true
     }
 
-    /// Loads todos from Core Data, importing leftover JSON or seeding samples when empty.
+    /// Loads todos from Core Data, seeding `seedTodos` when the store is empty.
     func load() throws -> [TodoItem] {
         try loadStoreIfNeeded()
 
         let existing = try fetchItems()
         if !existing.isEmpty {
             return existing
-        }
-
-        if let imported = importLegacyJSONIfPresent() {
-            try persist(imported)
-            if let legacyJSONURL {
-                try? FileManager.default.removeItem(at: legacyJSONURL)
-            }
-            return imported
         }
 
         if !seedTodos.isEmpty {
@@ -128,34 +111,20 @@ final class TodoCoreDataStore: TodoStoring {
         }
     }
 
-    private func importLegacyJSONIfPresent() -> [TodoItem]? {
-        guard let legacyJSONURL,
-              FileManager.default.fileExists(atPath: legacyJSONURL.path)
-        else { return nil }
-
-        guard let data = try? Data(contentsOf: legacyJSONURL),
-              let items = try? JSONDecoder().decode([TodoItem].self, from: data)
-        else { return nil }
-
-        return items
-    }
-
     private func loadStoreIfNeeded() throws {
         if let storeLoadError {
             throw TodoStoreError.persistenceFailed(underlying: storeLoadError)
         }
         guard !didLoadStore else { return }
 
-        if let storeURL {
-            let directory = storeURL.deletingLastPathComponent()
-            do {
-                try FileManager.default.createDirectory(
-                    at: directory,
-                    withIntermediateDirectories: true
-                )
-            } catch {
-                throw TodoStoreError.persistenceFailed(underlying: error)
-            }
+        let directory = storeURL.deletingLastPathComponent()
+        do {
+            try FileManager.default.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true
+            )
+        } catch {
+            throw TodoStoreError.persistenceFailed(underlying: error)
         }
 
         var loadError: Error?
@@ -177,37 +146,21 @@ final class TodoCoreDataStore: TodoStoring {
         return documents.appendingPathComponent("TodoList.sqlite", isDirectory: false)
     }
 
-    static var legacyJSONFileURL: URL {
-        let documents = FileManager.default.urls(
-            for: .documentDirectory,
-            in: .userDomainMask
-        ).first!
-        return documents.appendingPathComponent("item.json", isDirectory: false)
-    }
-
-    private static func makeContainer(
-        storeURL: URL?,
-        inMemory: Bool
-    ) -> NSPersistentContainer {
+    private static func makeContainer(storeURL: URL) -> NSPersistentContainer {
         let container = NSPersistentContainer(
             name: "TodoList",
             managedObjectModel: makeManagedObjectModel()
         )
         let description = NSPersistentStoreDescription()
-        if inMemory {
-            description.type = NSInMemoryStoreType
-            description.url = URL(fileURLWithPath: "/dev/null/\(UUID().uuidString)")
-        } else {
-            description.type = NSSQLiteStoreType
-            description.url = storeURL ?? defaultStoreURL
-        }
+        description.type = NSSQLiteStoreType
+        description.url = storeURL
         description.shouldMigrateStoreAutomatically = true
         description.shouldInferMappingModelAutomatically = true
         container.persistentStoreDescriptions = [description]
         return container
     }
 
-    /// Builds a fresh in-memory model per container. Compiled `.momd` files are immutable,
+    /// Builds a fresh model object per container. Compiled `.momd` files are immutable,
     /// so the schema is constructed in code instead of mutating the bundled model.
     static func makeManagedObjectModel() -> NSManagedObjectModel {
         makeProgrammaticModel()

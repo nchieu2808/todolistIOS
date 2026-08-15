@@ -12,8 +12,11 @@ struct TodoCoreDataStoreTests {
 
     @Test
     func loadSeedsWhenStoreIsEmpty() throws {
+        let storeURL = uniqueStoreURL()
+        defer { removeSQLiteStore(at: storeURL) }
+
         let store = TodoCoreDataStore(
-            inMemory: true,
+            storeURL: storeURL,
             seedTodos: [
                 TodoItem(id: "seed", title: "Seeded", isCompleted: false)
             ]
@@ -43,7 +46,10 @@ struct TodoCoreDataStoreTests {
 
     @Test
     func saveRoundTripsAllFields() throws {
-        let store = TodoCoreDataStore(inMemory: true, seedTodos: [])
+        let storeURL = uniqueStoreURL()
+        defer { removeSQLiteStore(at: storeURL) }
+
+        let store = TodoCoreDataStore(storeURL: storeURL, seedTodos: [])
         _ = try store.load()
 
         let due = TodoItem.milliseconds(from: Date(timeIntervalSince1970: 1_700_000_000))
@@ -69,8 +75,11 @@ struct TodoCoreDataStoreTests {
 
     @Test
     func saveDeletesItemsMissingFromTheNewList() throws {
+        let storeURL = uniqueStoreURL()
+        defer { removeSQLiteStore(at: storeURL) }
+
         let store = TodoCoreDataStore(
-            inMemory: true,
+            storeURL: storeURL,
             seedTodos: [
                 TodoItem(id: "keep", title: "Keep", isCompleted: false),
                 TodoItem(id: "drop", title: "Drop", isCompleted: false)
@@ -81,45 +90,6 @@ struct TodoCoreDataStoreTests {
         try store.save(todos)
 
         #expect(try store.load().map(\.id) == ["keep"])
-    }
-
-    @Test
-    func loadImportsLegacyJSONThenRemovesTheFile() throws {
-        let storeURL = uniqueStoreURL()
-        let jsonURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("legacy-\(UUID().uuidString).json")
-        defer {
-            removeSQLiteStore(at: storeURL)
-            try? FileManager.default.removeItem(at: jsonURL)
-        }
-
-        let legacy = [
-            TodoItem(
-                id: "json-1",
-                title: "From JSON",
-                todoDescription: "Migrated",
-                isCompleted: true,
-                imageUrl: "https://example.com/legacy.png",
-                dueDate: 1_234
-            )
-        ]
-        let data = try JSONEncoder().encode(legacy)
-        try data.write(to: jsonURL)
-
-        let store = TodoCoreDataStore(
-            storeURL: storeURL,
-            seedTodos: [TodoItem(id: "seed", title: "Should not seed", isCompleted: false)],
-            legacyJSONURL: jsonURL
-        )
-        let loaded = try store.load()
-
-        #expect(loaded.map(\.id) == ["json-1"])
-        #expect(loaded[0].title == "From JSON")
-        #expect(loaded[0].todoDescription == "Migrated")
-        #expect(loaded[0].isCompleted == true)
-        #expect(loaded[0].imageUrl == "https://example.com/legacy.png")
-        #expect(loaded[0].dueDate == 1_234)
-        #expect(!FileManager.default.fileExists(atPath: jsonURL.path))
     }
 
     @Test

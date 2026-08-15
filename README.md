@@ -54,9 +54,7 @@ TodoListIOS/
 
 ## Persistence
 
-`TodoCoreDataStore` implements `TodoStoring` and saves todos with Core Data. The live app uses a SQLite file (`TodoList.sqlite`) in the documents directory. Previews and some tests use an in-memory store.
-
-If an older `item.json` file is still present and Core Data is empty, that JSON list is imported once and then removed.
+`TodoCoreDataStore` implements `TodoStoring` and saves todos with Core Data SQLite on disk. The live app uses `TodoList.sqlite` in the documents directory. Previews and tests use temporary SQLite files.
 
 ## Data model
 

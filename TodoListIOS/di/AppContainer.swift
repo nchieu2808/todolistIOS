@@ -25,18 +25,15 @@ final class AppContainer {
 extension AppContainer {
     static let live = AppContainer(
         todoStore: TodoCoreDataStore(
-            storeURL: TodoCoreDataStore.defaultStoreURL,
-            seedTodos: TodoItem.sampleTodos,
-            legacyJSONURL: TodoCoreDataStore.legacyJSONFileURL
+            storeURL: TodoCoreDataStore.defaultStoreURL
         )
     )
 
     static var preview: AppContainer {
-        AppContainer(
-            todoStore: TodoCoreDataStore(
-                inMemory: true,
-                seedTodos: TodoItem.sampleTodos
-            )
+        let storeURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("todos-preview.sqlite")
+        return AppContainer(
+            todoStore: TodoCoreDataStore(storeURL: storeURL)
         )
     }
 

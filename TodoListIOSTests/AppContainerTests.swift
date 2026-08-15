@@ -82,7 +82,6 @@ struct AppContainerTests {
 
         let coreDataStore = try #require(container.todoStore as? TodoCoreDataStore)
         #expect(coreDataStore.storeURL == storeURL)
-        #expect(!coreDataStore.isInMemory)
 
         let viewModel = container.makeTodoListViewModel()
         await viewModel.loadTodos()
@@ -96,22 +95,23 @@ struct AppContainerTests {
         let container = AppContainer.live
         let store = try #require(container.todoStore as? TodoCoreDataStore)
         #expect(store.storeURL == TodoCoreDataStore.defaultStoreURL)
-        #expect(!store.isInMemory)
     }
 
     @Test
-    func previewUsesInMemoryCoreDataStoreWithSampleTodos() async throws {
+    func previewUsesTemporarySQLiteStore() async throws {
+        let previewURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("todos-preview.sqlite")
+        removeSQLiteStore(at: previewURL)
+
         let container = AppContainer.preview
         let store = try #require(container.todoStore as? TodoCoreDataStore)
-        #expect(store.isInMemory)
-        #expect(store.storeURL == nil)
+        #expect(store.storeURL == previewURL)
 
         let viewModel = container.makeTodoListViewModel()
         await viewModel.loadTodos()
 
-        #expect(viewModel.todos.count == TodoItem.sampleTodos.count)
-        #expect(
-            Set(viewModel.todos.map(\.id)) == Set(TodoItem.sampleTodos.map(\.id))
-        )
+        #expect(viewModel.todos.isEmpty)
+
+        removeSQLiteStore(at: previewURL)
     }
 }

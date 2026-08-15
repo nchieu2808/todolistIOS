@@ -109,7 +109,11 @@ struct TodoDetailView: View {
 #Preview {
     NavigationStack {
         TodoDetailView(
-            todo: TodoItem.sampleTodos[0],
+            todo: TodoItem(
+                title: "Buy groceries",
+                todoDescription: "Milk, eggs, bread, and coffee beans",
+                dueDate: TodoItem.milliseconds(from: Date())
+            ),
             onToggleCompleted: {}
         )
     }
